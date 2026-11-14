@@ -2,10 +2,12 @@
 #include "logger/scope.hpp"
 
 #include <cassert>
+#include <chrono>
 #include <filesystem>
 #include <fstream>
 #include <sstream>
 #include <string>
+#include <thread>
 
 namespace
 {
@@ -17,7 +19,7 @@ void nested_work()
 
     {
       LOG_SCOPE("further inside");
-      LOG_TRACE("trace");
+      LOG_TRACE("trace further inside trace further inside trace further inside trace further inside trace further inside trace further inside trace further inside trace further inside trace further inside trace further inside trace further inside trace further inside trace further inside trace further inside trace further inside trace further inside ");
       LOG_ERROR("error");
       LOG_CRITICAL("critical");
     }
@@ -78,6 +80,19 @@ int main()
     assert(contents.find("ms)") != std::string::npos);
 #endif
 
-    std::filesystem::remove(log_path);
+    // --- Periodic logging loop
+
+    for (int i = 0; i < 10; ++i)
+    {
+        LOG_SCOPE("periodic_tick");
+        LOG_DEBUG("tick {}", i);
+        if (i % 3 == 0)
+            LOG_WARN("periodic warning at tick {}", i);
+
+        logger::Logger::instance().flush();
+        std::this_thread::sleep_for(std::chrono::milliseconds(200));
+    }
+
+    // std::filesystem::remove(log_path);
     return 0;
 }
