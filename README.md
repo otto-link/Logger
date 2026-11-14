@@ -63,6 +63,8 @@ target_link_libraries(my_module PRIVATE Logger::Logger)
 target_compile_definitions(my_module PRIVATE LOGGER_MODULE_NAME="MyModule")
 ```
 
+> **Note:** Scope indentation (`t_indent_depth`) is preserved across modules on the same thread when they are linked into the same binary. Because `logger` is built as a `STATIC` library, if multiple separate shared libraries (`.so`/`.dll`) each link `Logger::Logger`, they may get separate `Logger` instances unless `logger` is built as `SHARED`.
+
 ### CMake Options
 
 | Option | Default | Description |
