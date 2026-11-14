@@ -73,6 +73,20 @@ target_compile_definitions(my_module PRIVATE LOGGER_MODULE_NAME="MyModule")
 | `LOGGER_LOG_THREAD_ID` | `OFF` | Include thread ID in log output |
 | `LOGGER_BUILD_TESTS` | `ON` (top-level) / `OFF` (subproject) | Build the `test_logger` executable |
 
+## Log Viewer
+
+A portable, zero-dependency Python/`tkinter` log viewer is included in [`tools/log_viewer.py`](tools/log_viewer.py):
+
+```bash
+python3 tools/log_viewer.py path/to/app.log
+```
+
+Features:
+- Live file tailing with automatic reset on truncation/restart
+- Collapsible per-thread scope tree with elapsed durations (enable `LOGGER_LOG_THREAD_ID=ON` for multithreaded apps)
+- Filtering by minimum log level, thread, `LOGGER_MODULE_NAME`, and search text
+- Line wrapping, Expand/Fold All, Pause/Resume, and Follow tail
+
 ## License
 
 This project is licensed under the GNU Lesser General Public License v2.1 — see [LICENSE](LICENSE) for details.
