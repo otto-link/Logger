@@ -8,6 +8,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 # --- Options
 
 option(LOGGER_ENABLE_TIMING "Enable RAII scope timing in log output" ON)
+option(LOGGER_LOG_THREAD_ID "Include thread ID in log output" OFF)
 option(LOGGER_BUILD_TESTS "Build Logger tests" ${PROJECT_IS_TOP_LEVEL})
 
 # --- Dependencies
@@ -42,6 +43,10 @@ target_link_libraries(logger
 
 if(LOGGER_ENABLE_TIMING)
     target_compile_definitions(logger PUBLIC LOGGER_ENABLE_TIMING)
+endif()
+
+if(LOGGER_LOG_THREAD_ID)
+    target_compile_definitions(logger PUBLIC LOGGER_LOG_THREAD_ID)
 endif()
 
 # --- Tests

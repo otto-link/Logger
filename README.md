@@ -70,6 +70,7 @@ target_compile_definitions(my_module PRIVATE LOGGER_MODULE_NAME="MyModule")
 | Option | Default | Description |
 | --- | --- | --- |
 | `LOGGER_ENABLE_TIMING` | `ON` | Enable elapsed time output on `LogScope` exit |
+| `LOGGER_LOG_THREAD_ID` | `OFF` | Include thread ID in log output |
 | `LOGGER_BUILD_TESTS` | `ON` (top-level) / `OFF` (subproject) | Build the `test_logger` executable |
 
 ## License

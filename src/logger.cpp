@@ -33,7 +33,11 @@ Logger& Logger::instance()
 Logger::Logger()
 {
     auto console_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
+#ifdef LOGGER_LOG_THREAD_ID
+    console_sink->set_pattern("[%H:%M:%S.%e] [%t] [%^%-8l%$] %v");
+#else
     console_sink->set_pattern("[%H:%M:%S.%e] [%^%-8l%$] %v");
+#endif
 
     std::vector<spdlog::sink_ptr> sinks{console_sink};
     m_logger = std::make_shared<spdlog::logger>("logger", sinks.begin(), sinks.end());
@@ -47,7 +51,11 @@ void Logger::enable_file_logging(const std::string& file_path, bool truncate)
     std::lock_guard<std::mutex> lock(m_mutex);
 
     auto file_sink = std::make_shared<spdlog::sinks::basic_file_sink_mt>(file_path, truncate);
+#ifdef LOGGER_LOG_THREAD_ID
+    file_sink->set_pattern("[%Y-%m-%d %H:%M:%S.%e] [%t] [%-8l] %v");
+#else
     file_sink->set_pattern("[%Y-%m-%d %H:%M:%S.%e] [%-8l] %v");
+#endif
 
     m_logger->sinks().push_back(file_sink);
 }
