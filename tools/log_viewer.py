@@ -156,6 +156,10 @@ class LogViewerApp:
         self.pause_btn = ttk.Button(toolbar, text="Pause", command=self._toggle_pause)
         self.pause_btn.pack(side=tk.LEFT, padx=(0, 6))
 
+        ttk.Button(toolbar, text="Reload", command=self._reload_file).pack(
+            side=tk.LEFT, padx=(0, 6)
+        )
+
         ttk.Button(toolbar, text="Clear", command=self._clear_view).pack(
             side=tk.LEFT, padx=(0, 6)
         )
@@ -291,6 +295,10 @@ class LogViewerApp:
         )
         if path:
             self._load_file(path)
+
+    def _reload_file(self) -> None:
+        if self.file_path:
+            self._load_file(self.file_path)
 
     def _toggle_pause(self) -> None:
         self.paused = not self.paused
