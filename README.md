@@ -87,6 +87,8 @@ Features:
 - Filtering by minimum log level, thread, `LOGGER_MODULE_NAME`, and search text
 - Line wrapping, Expand/Fold All, Pause/Resume, and Follow tail
 
+<img width="1093" height="546" alt="image" src="https://github.com/user-attachments/assets/5f47aac1-4bda-435c-b099-54dfdfbbe05d" />
+
 ## License
 
 This project is licensed under the GNU Lesser General Public License v2.1 — see [LICENSE](LICENSE) for details.
