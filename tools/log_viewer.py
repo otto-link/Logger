@@ -170,11 +170,19 @@ class LogViewerApp:
             side=tk.LEFT, padx=(0, 12)
         )
 
-        self.wrap_var = tk.BooleanVar(value=True)
+        self.wrap_var = tk.BooleanVar(value=False)
         ttk.Checkbutton(
             toolbar,
             text="Wrap lines",
             variable=self.wrap_var,
+            command=self._rebuild_tree,
+        ).pack(side=tk.LEFT, padx=(0, 12))
+
+        self.group_scopes_var = tk.BooleanVar(value=True)
+        ttk.Checkbutton(
+            toolbar,
+            text="Group by scope",
+            variable=self.group_scopes_var,
             command=self._rebuild_tree,
         ).pack(side=tk.LEFT, padx=(0, 12))
 
@@ -404,9 +412,10 @@ class LogViewerApp:
         return True
 
     def _insert_entry_if_matches(self, entry: LogEntry) -> Optional[str]:
+        group_scopes = self.group_scopes_var.get()
         stack = self.scope_stacks.setdefault(entry.thread_id, [])
 
-        if entry.scope_close is not None:
+        if group_scopes and entry.scope_close is not None:
             # Close matching scope on this thread's stack and attach duration
             for idx in range(len(stack) - 1, -1, -1):
                 name, item_id = stack[idx]
@@ -420,19 +429,20 @@ class LogViewerApp:
         if not self._matches_filter(entry):
             return None
 
-        parent_id = stack[-1][1] if stack else ""
+        parent_id = (stack[-1][1] if stack else "") if group_scopes else ""
         if parent_id and not self.tree.exists(parent_id):
             parent_id = ""
 
-        label = entry.scope_open if entry.scope_open else entry.message
-        if self.wrap_var.get() and entry.scope_open is None:
+        is_scope_node = group_scopes and entry.scope_open is not None
+        label = entry.scope_open if is_scope_node else entry.message
+        if self.wrap_var.get() and not is_scope_node:
             col_px = self.tree.column("#0", "width")
             wrap_width = max(40, col_px // 7)
             lines = textwrap.wrap(label, width=wrap_width) or [label]
         else:
             lines = [label]
 
-        tags = (entry.level, "scope") if entry.scope_open else (entry.level,)
+        tags = (entry.level, "scope") if is_scope_node else (entry.level,)
         item_id = self.tree.insert(
             parent_id,
             tk.END,
@@ -458,7 +468,7 @@ class LogViewerApp:
                 open=True,
             )
 
-        if entry.scope_open is not None:
+        if is_scope_node:
             stack.append((entry.scope_open, item_id))
 
         return item_id
