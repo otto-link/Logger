@@ -190,6 +190,14 @@ class LogViewerApp:
             command=self._rebuild_tree,
         ).pack(side=tk.LEFT, padx=(0, 12))
 
+        self.hide_empty_scopes_var = tk.BooleanVar(value=False)
+        ttk.Checkbutton(
+            toolbar,
+            text="Hide empty scopes",
+            variable=self.hide_empty_scopes_var,
+            command=self._rebuild_tree,
+        ).pack(side=tk.LEFT, padx=(0, 12))
+
         self.file_label_var = tk.StringVar(value="No file loaded")
         ttk.Label(toolbar, textvariable=self.file_label_var, foreground="#555555").pack(
             side=tk.LEFT, fill=tk.X, expand=True
@@ -429,8 +437,11 @@ class LogViewerApp:
                 name, item_id = stack[idx]
                 if name == entry.scope_close:
                     del stack[idx:]
-                    if entry.duration and self.tree.exists(item_id):
-                        self.tree.set(item_id, "duration", entry.duration)
+                    if self.tree.exists(item_id):
+                        if self.hide_empty_scopes_var.get() and not self.tree.get_children(item_id):
+                            self.tree.delete(item_id)
+                        elif entry.duration:
+                            self.tree.set(item_id, "duration", entry.duration)
                     return None
             # Unmatched close: fall through and display as normal line
 
@@ -498,7 +509,20 @@ class LogViewerApp:
 
     def _update_status(self) -> None:
         state = "Paused" if self.paused else "Tailing"
-        self.status_var.set(f"{state} | Entries: {len(self.entries)}")
+        warnings = 0
+        errors = 0
+        criticals = 0
+        for entry in self.entries:
+            if entry.level == "warning":
+                warnings += 1
+            elif entry.level == "error":
+                errors += 1
+            elif entry.level == "critical":
+                criticals += 1
+
+        self.status_var.set(
+            f"{state} | Entries: {len(self.entries)} | Warnings: {warnings} | Errors: {errors} | Criticals: {criticals}"
+        )
 
 
 def main() -> None:
