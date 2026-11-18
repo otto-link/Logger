@@ -5,6 +5,7 @@
 #include "logger/logger.hpp"
 
 #include <algorithm>
+#include <atomic>
 #include <vector>
 
 #include <spdlog/sinks/basic_file_sink.h>
@@ -16,7 +17,9 @@ namespace logger
 namespace
 {
 
-thread_local int t_indent_depth = 0;
+std::atomic<ContextId>      g_next_context_id{1};
+thread_local int            t_indent_depth = 0;
+thread_local std::vector<ContextId> t_context_stack;
 
 } // namespace
 
@@ -94,6 +97,48 @@ std::string Logger::indent_prefix()
     return std::string(static_cast<size_t>(t_indent_depth) * 2, ' ');
 }
 
+// --- Thread-local context helpers
+
+ContextId Logger::next_context_id()
+{
+    return g_next_context_id.fetch_add(1, std::memory_order_relaxed);
+}
+
+void Logger::push_context(ContextId id)
+{
+    t_context_stack.push_back(id);
+}
+
+void Logger::pop_context()
+{
+    if (!t_context_stack.empty())
+        t_context_stack.pop_back();
+}
+
+ContextId Logger::current_context()
+{
+    return t_context_stack.empty() ? 0 : t_context_stack.back();
+}
+
+std::string Logger::context_prefix()
+{
+    if (t_context_stack.empty())
+        return {};
+
+    std::string prefix = "[ctx:";
+
+    for (size_t i = 0; i < t_context_stack.size(); ++i)
+    {
+        if (i > 0)
+            prefix += '/';
+
+        prefix += std::to_string(t_context_stack[i]);
+    }
+
+    prefix += "] ";
+    return prefix;
+}
+
 // --- Internal logging
 
 void Logger::log_raw(const char*               module,
@@ -103,7 +148,12 @@ void Logger::log_raw(const char*               module,
     std::lock_guard<std::mutex> lock(m_mutex);
 
     const char* safe_module = (module != nullptr) ? module : "default";
-    m_logger->log(level, "[{}] {}{}", safe_module, indent_prefix(), message);
+    m_logger->log(level,
+                  "[{}] {}{}{}",
+                  safe_module,
+                  context_prefix(),
+                  indent_prefix(),
+                  message);
 }
 
 } // namespace logger

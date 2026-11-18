@@ -47,6 +47,7 @@ LOG_LINE_RE = re.compile(
     r"(?:\[(?P<tid>\d+)\]\s+)?"
     r"\[(?P<level>[a-zA-Z]+)\s*\]\s+"
     r"\[(?P<module>[^\]]+)\]\s"
+    r"(?:\[ctx:(?P<ctx>[0-9/]+)\]\s)?"
     r"(?P<body>.*)$"
 )
 
@@ -67,6 +68,7 @@ class LogEntry:
     scope_open: Optional[str] = None
     scope_close: Optional[str] = None
     duration: str = ""
+    ctx_path: Tuple[str, ...] = ()
     raw: str = ""
 
 
@@ -102,6 +104,9 @@ def parse_log_line(line: str) -> LogEntry:
             scope_close = close_m.group("name")
             duration = close_m.group("duration") or ""
 
+    ctx_raw = match.group("ctx")
+    ctx_path = tuple(ctx_raw.split("/")) if ctx_raw else ()
+
     return LogEntry(
         timestamp=match.group("ts"),
         thread_id=match.group("tid") or "main",
@@ -112,6 +117,7 @@ def parse_log_line(line: str) -> LogEntry:
         scope_open=scope_open,
         scope_close=scope_close,
         duration=duration,
+        ctx_path=ctx_path,
         raw=stripped,
     )
 
@@ -136,6 +142,8 @@ class LogViewerApp:
 
         # Per-thread stack of open tree item IDs: {thread_id: [(scope_name, item_id), ...]}
         self.scope_stacks: Dict[str, List[Tuple[str, str]]] = {}
+        # Context ID -> tree item ID (persists after context creator exits for detached subthreads)
+        self.context_items: Dict[str, str] = {}
 
         self._build_ui()
 
@@ -190,11 +198,19 @@ class LogViewerApp:
             command=self._rebuild_tree,
         ).pack(side=tk.LEFT, padx=(0, 12))
 
-        self.hide_empty_scopes_var = tk.BooleanVar(value=False)
+        self.hide_empty_scopes_var = tk.BooleanVar(value=True)
         ttk.Checkbutton(
             toolbar,
             text="Hide empty scopes",
             variable=self.hide_empty_scopes_var,
+            command=self._rebuild_tree,
+        ).pack(side=tk.LEFT, padx=(0, 12))
+
+        self.raw_mode_var = tk.BooleanVar(value=False)
+        ttk.Checkbutton(
+            toolbar,
+            text="Raw",
+            variable=self.raw_mode_var,
             command=self._rebuild_tree,
         ).pack(side=tk.LEFT, padx=(0, 12))
 
@@ -326,6 +342,7 @@ class LogViewerApp:
     def _clear_view(self) -> None:
         self.entries.clear()
         self.scope_stacks.clear()
+        self.context_items.clear()
         self.tree.delete(*self.tree.get_children())
         self._update_status()
 
@@ -337,6 +354,7 @@ class LogViewerApp:
         self.threads.clear()
         self.modules.clear()
         self.scope_stacks.clear()
+        self.context_items.clear()
         self.tree.delete(*self.tree.get_children())
         self.file_label_var.set(self.file_path)
         self._read_new_lines()
@@ -362,6 +380,7 @@ class LogViewerApp:
             self.file_offset = 0
             self.entries.clear()
             self.scope_stacks.clear()
+            self.context_items.clear()
             self.tree.delete(*self.tree.get_children())
 
         self.file_inode = stat.st_ino
@@ -428,7 +447,8 @@ class LogViewerApp:
         return True
 
     def _insert_entry_if_matches(self, entry: LogEntry) -> Optional[str]:
-        group_scopes = self.group_scopes_var.get()
+        raw_mode = self.raw_mode_var.get()
+        group_scopes = (not raw_mode) and self.group_scopes_var.get()
         stack = self.scope_stacks.setdefault(entry.thread_id, [])
 
         if group_scopes and entry.scope_close is not None:
@@ -449,11 +469,17 @@ class LogViewerApp:
             return None
 
         parent_id = (stack[-1][1] if stack else "") if group_scopes else ""
+        if group_scopes and not parent_id and entry.ctx_path:
+            ctx_id = entry.ctx_path[-1]
+            if ctx_id in self.context_items:
+                parent_id = self.context_items[ctx_id]
+            elif len(entry.ctx_path) > 1 and entry.ctx_path[-2] in self.context_items:
+                parent_id = self.context_items[entry.ctx_path[-2]]
         if parent_id and not self.tree.exists(parent_id):
             parent_id = ""
 
         is_scope_node = group_scopes and entry.scope_open is not None
-        label = entry.scope_open if is_scope_node else entry.message
+        label = entry.raw if raw_mode else (entry.scope_open if is_scope_node else entry.message)
         if self.wrap_var.get() and not is_scope_node:
             col_px = self.tree.column("#0", "width")
             wrap_width = max(40, col_px // 7)
@@ -489,11 +515,14 @@ class LogViewerApp:
 
         if is_scope_node:
             stack.append((entry.scope_open, item_id))
+            if entry.ctx_path and entry.ctx_path[-1] not in self.context_items:
+                self.context_items[entry.ctx_path[-1]] = item_id
 
         return item_id
 
     def _rebuild_tree(self) -> None:
         self.scope_stacks.clear()
+        self.context_items.clear()
         self.tree.delete(*self.tree.get_children())
 
         last_item = None

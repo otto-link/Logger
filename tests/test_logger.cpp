@@ -80,6 +80,50 @@ int main()
     assert(contents.find("ms)") != std::string::npos);
 #endif
 
+    // --- Nested fire-and-forget threads (3 levels)
+
+    {
+        std::atomic<int> remaining{2};
+
+        auto launch_level1 = [&remaining]() {
+            LOG_CONTEXT(ctx1, "level1_fct");
+            LOG_INFO("level1 started");
+
+            for (int i = 0; i < 2; ++i)
+            {
+                std::thread([ctx1, i, &remaining]() {
+                    LOG_CONTEXT_ATTACH(ctx1);
+                    LOG_CONTEXT(ctx2, "level2_sub");
+                    LOG_INFO("level2 {} started", i);
+
+                    std::thread([ctx2, i, &remaining]() {
+                        LOG_CONTEXT_ATTACH(ctx2);
+                        LOG_CONTEXT(ctx3, "level3_leaf");
+                        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+                        LOG_INFO("level3 {} finished", i);
+                        remaining.fetch_sub(1);
+                    }).detach();
+                }).detach();
+            }
+        };
+
+        launch_level1();
+        assert(logger::Logger::current_context() == 0);
+
+        while (remaining.load() > 0)
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+
+        logger::Logger::instance().flush();
+
+        const std::string ctx_contents = read_file(log_path);
+        assert(ctx_contents.find("[ctx:1] <level1_fct>") != std::string::npos);
+        assert(ctx_contents.find("[ctx:1]   level1 started") != std::string::npos);
+        assert(ctx_contents.find("[ctx:1/") != std::string::npos);
+        assert(ctx_contents.find("level2 0 started") != std::string::npos);
+        assert(ctx_contents.find("level3 0 finished") != std::string::npos);
+        assert(ctx_contents.find("level3 1 finished") != std::string::npos);
+    }
+
     // --- Periodic logging loop
 
     for (int i = 0; i < 10; ++i)

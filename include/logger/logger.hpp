@@ -4,6 +4,7 @@
    
 #pragma once
 
+#include <cstdint>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -16,6 +17,8 @@
 
 namespace logger
 {
+
+using ContextId = uint64_t;
 
 class Logger
 {
@@ -37,6 +40,14 @@ public:
     static void        pop_indent();
     static int         indent_depth();
     static std::string indent_prefix();
+
+    // --- Thread-local context helpers
+
+    static ContextId   next_context_id();
+    static void        push_context(ContextId id);
+    static void        pop_context();
+    static ContextId   current_context();
+    static std::string context_prefix();
 
     // --- Logging methods
 
